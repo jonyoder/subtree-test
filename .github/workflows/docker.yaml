@@ -1,0 +1,64 @@
+name: Docker
+
+on:
+  push:
+    branches:
+      - "main"
+      - "rc-v**"
+      - "docker**"
+  schedule:
+    - cron:  '0 0 1 * *' # first of every month
+
+
+jobs:
+  docker:
+    name: ${{ matrix.config.tags }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+
+      matrix:
+        r_version:
+          - "latest"
+
+        config:
+        - name: "v1.2.0"
+          # always overwrite the latest version with the CRAN version
+          tags: "v1.2.0,latest"
+          ref: "v1.2.0"
+
+        - name: "v1.1.0"
+          tags: "v1.1.0"
+          ref: "v1.1.0"
+
+        - name: "v1.0.0"
+          tags: "v1.0.0"
+          ref: "v1.0.0"
+
+        # always rebuild legacy to pick up newer R library builds
+        - name: "v0.4.6"
+          tags: "v0.4.6"
+          ref: "v0.4.6"
+          extra_buildargs: ",ENTRYPOINT_FILE=/usr/local/lib/R/site-library/plumber/examples/04-mean-sum/plumber.R"
+
+        - name: GitHub
+          # 'next' tag signifies the _next_ release
+          tags: "next"
+          ref: "main"
+
+
+    steps:
+    - uses: actions/checkout@v2
+
+    # https://github.com/marketplace/actions/publish-docker
+    - name: rstudio/plumber
+      uses: elgohr/Publish-Docker-Github-Action@2.18
+      with:
+        name: rstudio/plumber
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        cache: false
+        workdir: "."
+        buildargs: "R_VERSION=${{ matrix.r_version }},PLUMBER_REF=${{ matrix.config.ref }}${{ matrix.config.extra_buildargs }}"
+        tags: ${{ matrix.config.tags }}
